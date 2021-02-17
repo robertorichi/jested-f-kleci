@@ -450,14 +450,14 @@
             if ( INTERSECTED != intersects[ 0 ].object) {
 
                 
-                if ( INTERSECTED && INTERSECTED.material && INTERSECTED.material.emissive) {
-                   INTERSECTED.material.emissive.setHex( INTERSECTED.currentHex );
+                if ( INTERSECTED && INTERSECTED.material && INTERSECTED.material.color) {
+                   INTERSECTED.material.color.setHex( INTERSECTED.currentHex );
                 }
 
                 INTERSECTED = intersects[ 0 ].object;
-                if ( INTERSECTED && INTERSECTED.material && INTERSECTED.material.emissive) {
-                    INTERSECTED.currentHex = INTERSECTED.material.emissive.getHex();
-                    INTERSECTED.material.emissive.setHex( 0xff0000 );
+                if ( INTERSECTED && INTERSECTED.material && INTERSECTED.material.color) {
+                    INTERSECTED.currentHex = INTERSECTED.material.color.getHex();
+                    INTERSECTED.material.color.setHex( 0xff0000 );
                     
                 }
                 if (hoveredObj.name != 'box_atelier') {
@@ -469,8 +469,8 @@
         } else {
             controls.enabled_move = true;
 
-            if ( INTERSECTED && INTERSECTED.material && INTERSECTED.material.emissive) {
-                INTERSECTED.material.emissive.setHex( INTERSECTED.currentHex );
+            if ( INTERSECTED && INTERSECTED.material && INTERSECTED.material.color) {
+                INTERSECTED.material.color.setHex( INTERSECTED.currentHex );
             }
 
             INTERSECTED = null;

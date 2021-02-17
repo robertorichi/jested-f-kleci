@@ -1,0 +1,396 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>test_controls</title>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=0">
+    <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.5.1/jquery.min.js"></script>
+    <style>
+        html, body {
+            height: 100%;
+            width: 100%;
+            margin: 0;
+            padding: 0;
+            overflow: hidden;
+        }
+        #viewport {
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            top: 0;
+            left: 0;
+        }
+        #tooltip {
+          position: fixed;
+          left: 0;
+          top: 0;
+          min-width: 100px;
+          text-align: center;
+          padding: 5px 12px;
+          font-family: monospace;
+          background: lightgray;
+          display: none;
+          opacity: 0;
+          border: 1px solid black;
+          box-shadow: 2px 2px 3px rgba(0, 0, 0, 0.5);
+          transition: opacity 0.25s linear;
+          border-radius: 3px;
+        }
+    </style>
+</head>
+<body>
+<div id="viewport"></div>
+<div id="tooltip"></div>
+<script src="https://ajax.googleapis.com/ajax/libs/jquery/3.5.1/jquery.min.js"></script>
+<script type="module">
+    import * as THREE from './build/three.module.js';
+    import { IndoorControls } from './jsm/IndoorControls.js';
+    import { DeviceOrientationControls } from './jsm/DeviceOrientationControls.js';
+    import { Interaction } from './build/three.interaction.module.js';
+
+    let raycaster;
+    let objectToIntersect;
+
+    let INTERSECTED;
+    var viewport, camera, scene, renderer, controls, controls_device_orientation, cubeCamera;
+    let bulbLight, bulbMat, hemiLight;
+    var room = new THREE.Object3D();
+    var rooms = [];
+    var isMobile = false;
+
+    const mouse = new THREE.Vector2();
+
+    init();
+    animate();
+
+    function init() {
+        if(/Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent)) {
+            isMobile = true;
+        }
+
+
+        // CAMERA
+        camera = new THREE.PerspectiveCamera( 65, window.innerWidth / window.innerHeight, 1, 2000 );
+        camera.position.x = 3;
+        camera.position.z = 2;
+        camera.position.y = 0.7;
+        camera.lookAt( new THREE.Vector3( -20, 0, -200 ) );
+
+        // SCENE
+        scene = new THREE.Scene();
+        scene.background = new THREE.Color(0xffffff);
+
+        raycaster = new THREE.Raycaster();
+
+        renderer = new THREE.WebGLRenderer( { antialias: true } );
+        renderer.setSize( window.innerWidth, window.innerHeight );
+        renderer.setPixelRatio( window.devicePixelRatio );
+        // renderer.toneMapping = THREE.ACESFilmicToneMapping;
+        // renderer.toneMappingExposure = 1.2;
+        renderer.outputEncoding = THREE.sRGBEncoding;
+        renderer.shadowMap.enabled = true;
+        renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+
+        const interaction = new Interaction(renderer, scene, camera);
+
+        viewport = document.getElementById( 'viewport' );
+        viewport.appendChild( renderer.domElement );
+
+
+        controls = new IndoorControls( camera, renderer.domElement );
+        controls_device_orientation = new DeviceOrientationControls( camera );
+
+        // mouse helper
+        let helperMaterial = new THREE.MeshBasicMaterial();
+        helperMaterial.transparent = true;
+        helperMaterial.opacity = 0.2;
+        let helperGeometry = new THREE.CircleBufferGeometry( 0.2, 64 );
+        let mouseHelper = new THREE.Mesh( helperGeometry, helperMaterial );
+
+        let ringMaterial = new THREE.MeshBasicMaterial();
+        ringMaterial.transparent = true;
+        ringMaterial.opacity = 0.8;
+        let ringGeometry = new THREE.RingBufferGeometry( 0.2, 0.22, 64 );
+        let ring = new THREE.Mesh( ringGeometry, ringMaterial );
+        mouseHelper.add( ring );
+
+        mouseHelper.visible = false;
+        mouseHelper.renderOrder = 1;
+
+        scene.add( mouseHelper );
+
+
+        // LOAD SCENE
+        objectToIntersect = new Array();
+        var loader = new THREE.ObjectLoader();
+        loader.load("./models/scene.json", function ( obj ) {
+            let sceneImport = obj;
+            sceneImport.traverse( function ( node ) {
+                if (node.name === 'atelier_floor') {
+                    controls.ground.push( node );
+
+                }
+                if (node.name === 'box_atelier') {
+                    objectToIntersect.push( node );
+                    makeClickable( node );
+                }
+                if (node.name === 'Box') {
+                    objectToIntersect.push( node );
+                }
+
+
+            } );
+            sceneImport.scale.set( 0.01, 0.01, 0.01 );
+            setModelConfig( sceneImport );
+            room = sceneImport;
+            rooms.push( sceneImport );
+            scene.add( sceneImport );
+        });
+
+
+
+
+        // click mouse
+        controls.addEventListener( 'move', function ( event ) {
+
+            let intersect = event.intersect;
+            let normal = intersect.face.normal;
+
+            if ( normal.y !== 1 ) {
+
+                mouseHelper.visible = false;
+                controls.enabled_move = false;
+
+            } else {
+
+                mouseHelper.position.set( 0, 0, 0 );
+                mouseHelper.lookAt( normal );
+
+                mouseHelper.position.copy( intersect.point );
+                mouseHelper.position.addScaledVector( normal, 0.001 );
+
+                mouseHelper.visible = true;
+                controls.enabled_move = true;
+
+            }
+
+        } );
+
+        document.addEventListener( 'mousemove', onDocumentMouseMove, false );
+
+        // on resize
+        window.addEventListener( 'resize', onWindowResize, false );
+    }
+    
+    var latestMouseProjection; // this is the latest projection of the mouse on object (i.e. intersection with ray)
+    var hoveredObj; // this objects is hovered at the moment
+    
+    // tooltip will not appear immediately. If object was hovered shortly,
+    // - the timer will be canceled and tooltip will not appear at all.
+    var tooltipDisplayTimeout;
+    
+    // This will move tooltip to the current mouse position and show it by timer.
+    function showTooltip() {
+        var divElement = $("#tooltip");
+    
+        if (divElement && latestMouseProjection) {
+            divElement.css({
+                display: "block",
+                opacity: 0.0
+            });
+    
+            var canvasHalfWidth = renderer.domElement.offsetWidth / 2;
+            var canvasHalfHeight = renderer.domElement.offsetHeight / 2;
+    
+            var tooltipPosition = latestMouseProjection.clone().project(camera);
+            tooltipPosition.x = (tooltipPosition.x * canvasHalfWidth) + canvasHalfWidth + renderer.domElement.offsetLeft;
+            tooltipPosition.y = -100 -(tooltipPosition.y * canvasHalfHeight) + canvasHalfHeight + renderer.domElement.offsetTop;
+    
+            var tootipWidth = divElement[0].offsetWidth;
+            var tootipHeight = divElement[0].offsetHeight;
+    
+            divElement.css({
+                left: `${tooltipPosition.x - tootipWidth/2}px`,
+                top: `${tooltipPosition.y - tootipHeight - 5}px`
+            });
+    
+            // var position = new THREE.Vector3();
+            // var quaternion = new THREE.Quaternion();
+            // var scale = new THREE.Vector3();
+            // hoveredObj.matrix.decompose(position, quaternion, scale);
+            divElement.text(hoveredObj.userData.text);
+    
+            setTimeout(function() {
+                divElement.css({
+                    opacity: 1.0
+                });
+            }, 25);
+        }
+    }
+    
+    // This will immediately hide tooltip.
+    function hideTooltip() {
+        var divElement = $("#tooltip");
+        if (divElement) {
+            divElement.css("display", "none");
+        }
+    }
+
+    function makeClickable( node ) {
+        node.cursor = 'pointer';
+        var url = node.userData.url;
+
+        node.on('mousedown', function(ev) {
+            controls.enabled_move = false;
+        });
+        node.on('mouseup', function(ev) {
+            window.open(url);
+            controls.enabled_move = true;
+        });
+        node.on('touchend', function(ev) {
+
+            window.open(url);
+            mouseHelper.visible = true;
+            controls.enabled_move = true;
+
+            // blink(document.querySelector('#mousedown'));
+            console.log('%c' + node.name + '%c => mousedown', 'color: #fff; background: #41b882; padding: 3px 4px;', 'color: #41b882; background: #fff;');
+        });
+    }
+
+
+    function onDocumentMouseMove( event ) {
+        event.preventDefault();
+
+        mouse.x = ( event.clientX / window.innerWidth ) * 2 - 1;
+        mouse.y = - ( event.clientY / window.innerHeight ) * 2 + 1;
+        
+        latestMouseProjection = undefined;
+        hoveredObj = undefined;
+        handleManipulationUpdate();
+      
+
+    }
+
+    // on resize
+    function onWindowResize() {
+
+        camera.aspect = window.innerWidth / window.innerHeight;
+        camera.updateProjectionMatrix();
+
+        renderer.setSize( window.innerWidth, window.innerHeight );
+        controls.reset( camera, renderer.domElement );
+
+    }
+
+
+
+    // set model config
+    function setModelConfig( sceneImport ) {
+
+        let boxSize = new THREE.Vector3();
+        const roomBox = new THREE.Box3().setFromObject( sceneImport );
+        const size = roomBox.getSize( boxSize ).length();
+        const center = roomBox.getCenter( new THREE.Vector3() );
+
+        camera.near = size / 100;
+        camera.far = size * 100;
+        // camera.position.copy( center );
+
+
+        // camera.position.y -= boxSize.y * 0.02;
+        // camera.position.y = 0.7;
+        // let cameraLook = camera.position.clone();
+        // cameraLook.x += boxSize.x * 0.02;
+        // cameraLook.y -= boxSize.y * 0.02;
+        // cameraLook.z += boxSize.z * 0.02;
+        // camera.lookAt( objectToIntersect[0].position );
+
+        controls.update();
+        camera.updateProjectionMatrix();
+
+    }
+
+    function animate() {
+
+        window.requestAnimationFrame( animate );
+        controls.update();
+
+        if(isMobile) {
+            controls_device_orientation.update();
+        }
+
+        // render();
+          
+        latestMouseProjection = undefined;
+        hoveredObj = undefined;
+        handleManipulationUpdate();  
+          
+        renderer.render( scene, camera );
+        
+    }
+
+    function handleManipulationUpdate() {
+
+        // find intersections
+        raycaster.setFromCamera( mouse, camera );
+
+        const intersects = raycaster.intersectObjects( objectToIntersect, true );
+
+
+        if ( intersects.length > 0 ) {
+            controls.enabled_move = false;
+            
+            latestMouseProjection = intersects[0].point;
+            hoveredObj = intersects[0].object;
+            
+            if ( INTERSECTED != intersects[ 0 ].object) {
+
+                
+                if ( INTERSECTED && INTERSECTED.material && INTERSECTED.material.emissive) {
+                   INTERSECTED.material.emissive.setHex( INTERSECTED.currentHex );
+                }
+
+                INTERSECTED = intersects[ 0 ].object;
+                if ( INTERSECTED && INTERSECTED.material && INTERSECTED.material.emissive) {
+                    INTERSECTED.currentHex = INTERSECTED.material.emissive.getHex();
+                    INTERSECTED.material.emissive.setHex( 0xff0000 );
+                    
+                }
+                if (hoveredObj.name != 'box_atelier') {
+                    showTooltip();
+                }
+                
+            }
+            
+        } else {
+            controls.enabled_move = true;
+
+            if ( INTERSECTED && INTERSECTED.material && INTERSECTED.material.emissive) {
+                INTERSECTED.material.emissive.setHex( INTERSECTED.currentHex );
+            }
+
+            INTERSECTED = null;
+            hideTooltip();
+        }
+            
+        // if (tooltipDisplayTimeout || !latestMouseProjection) {
+        //     clearTimeout(tooltipDisplayTimeout);
+        //     tooltipDisplayTimeout = undefined;
+        //     hideTooltip();
+        // }
+    
+        // if (!tooltipDisplayTimeout && latestMouseProjection) {
+        //     tooltipDisplayTimeout = setTimeout(function() {
+        //         tooltipDisplayTimeout = undefined;
+        //         showTooltip();
+        //     }, 5);
+        // }
+
+        // renderer.render( scene, camera );
+
+    }
+
+</script>
+</body>
+</html>

@@ -466,13 +466,13 @@
             }
 
         } else {
-            if (hoveredObj.name != 'box_atelier') {
+//             if (hoveredObj.name != 'box_atelier') {
                 if (INTERSECTED && INTERSECTED.material && INTERSECTED.material.color) {
                     INTERSECTED.material.color.setHex(INTERSECTED.currentHex);
                 }
 
                 INTERSECTED = null;
-            }
+//             }
             hideTooltip();
             controls.enabled_move = true;
         }

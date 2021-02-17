@@ -447,35 +447,37 @@
             latestMouseProjection = intersects[0].point;
             hoveredObj = intersects[0].object;
 
-            if ( INTERSECTED != intersects[ 0 ].object) {
-                
-                showTooltip();
-                if (hoveredObj.name == 'box_atelier') {
-                    if (INTERSECTED && INTERSECTED.material && INTERSECTED.material.color) {
-                        INTERSECTED.material.color.setHex(INTERSECTED.currentHex);
-                    }
+            if ( INTERSECTED != hoveredObj) {
+
+
+                if (INTERSECTED && INTERSECTED.material && INTERSECTED.material.color) {
+                    INTERSECTED.material.color.setHex(INTERSECTED.currentHex);
                 }
+                
 
                 INTERSECTED = intersects[ 0 ].object;
                 if (hoveredObj.name == 'box_atelier') {
                     if (INTERSECTED && INTERSECTED.material && INTERSECTED.material.color) {
                         INTERSECTED.currentHex = INTERSECTED.material.color.getHex();
                         INTERSECTED.material.color.setHex(0xff0000);
+
                     }
                 }
+                if (hoveredObj.name != 'box_atelier') {
+                    showTooltip();
+                }
+
             }
 
         } else {
-            if (hoveredObj.name == 'box_atelier') {
-                if (INTERSECTED && INTERSECTED.material && INTERSECTED.material.color) {
-                    INTERSECTED.material.color.setHex(INTERSECTED.currentHex);
-                }
+            controls.enabled_move = true;
+
+            if ( INTERSECTED && INTERSECTED.material && INTERSECTED.material.color) {
+                INTERSECTED.material.color.setHex( INTERSECTED.currentHex );
             }
 
             INTERSECTED = null;
-            
             hideTooltip();
-            controls.enabled_move = true;
         }
 
         // if (tooltipDisplayTimeout || !latestMouseProjection) {

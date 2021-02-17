@@ -449,7 +449,7 @@
 
             if ( INTERSECTED != intersects[ 0 ].object) {
 
-if (hoveredObj.name == 'box_atelier') {
+
                 if ( INTERSECTED && INTERSECTED.material && INTERSECTED.material.color) {
                     INTERSECTED.material.color.setHex( INTERSECTED.currentHex );
                 }
@@ -457,10 +457,11 @@ if (hoveredObj.name == 'box_atelier') {
                 INTERSECTED = intersects[ 0 ].object;
                 if ( INTERSECTED && INTERSECTED.material && INTERSECTED.material.color) {
                     INTERSECTED.currentHex = INTERSECTED.material.color.getHex();
-                    INTERSECTED.material.color.setHex( 0xff0000 );
-
+                    if (hoveredObj.name == 'box_atelier') {
+                        INTERSECTED.material.color.setHex( 0xff0000 );
+                    }
                 }
-}
+
                 if (hoveredObj.name != 'box_atelier') {
                     showTooltip();
                 }

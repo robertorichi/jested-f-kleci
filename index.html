@@ -215,7 +215,8 @@
         };
 
         manager.onLoad = function ( ) {
-
+	const loadingScreen = document.getElementById( 'loading-screen' );
+            loadingScreen.classList.add( 'fade-out' );
             console.log( 'Loading complete!');
 
         };
@@ -244,7 +245,7 @@
         } );
         
         objectToIntersect = new Array();
-        var loader = new THREE.ObjectLoader(loadingManager);
+        var loader = new THREE.ObjectLoader(manager);
         loader.load("./models/scene.json", function ( obj ) {
             let sceneImport = obj;
             sceneImport.traverse( function ( node ) {
